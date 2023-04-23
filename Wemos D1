@@ -1,0 +1,467 @@
+// Code Wemos d1 Master in der ic2 Verbindung
+
+
+// Bibiliotheken aufruf
+#include "arduino_secrets.h"
+#include "thingProperties.h"
+#include <Wire.h>
+#include <NTPClient.h>
+#include <ESP8266WiFi.h>
+#include <WiFiUdp.h>
+#include <TimeLib.h> // Fügen Sie diese Zeile oben in Ihrem Code hinzu, um die TimeLib-Bibliothek einzubinden
+
+// Variabeln für den Time Client
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP);
+
+
+// LOOP
+void loop() {
+
+  //Funktionsaufruf für die Ausführung
+  ArduinoCloud.update();
+  updateTimeClient();
+  sendDataToSlave();
+  displaySentData();
+  requestDataFromSlave();
+  displayReceivedData();
+  updateVariables();
+  onVentilatorsteuerungChange();
+  
+  // Timer überwachung der Signalübertragung
+  if (LichtAn && millis() - lichtanTimestamp >= 2000) {
+    LichtAn = false;
+  }
+
+  if (LichtAus && millis() - lichtausTimestamp >= 2000) {
+    LichtAus = false;
+  }
+
+    if (PumpeAn && millis() - pumpanTimestamp >= 2000) {
+    PumpeAn = false;
+  }
+
+  if (PumpeAus && millis() - pumpausTimestamp >= 2000) {
+    PumpeAus = false;
+
+  }
+}
+
+void onLichtanChange() {
+  if (lichtan) {
+    LichtAn = true;
+    LichtAus = false;
+    lichtanTimestamp = millis();
+  }
+    // Timer überwachung der Signalübertragung
+  if (LichtAn && millis() - lichtanTimestamp >= 2000) {
+    LichtAn = false;
+  }
+
+
+}
+
+
+void onLichtausChange()  {
+  if (lichtaus) {
+    LichtAus = true;
+    lichtausTimestamp = millis();
+  }
+    if (LichtAus && millis() - lichtausTimestamp >= 2000) {
+    LichtAus = false;
+  }
+
+}
+
+void onPumpanChange()  {
+  if (pumpan) {
+    PumpeAn = true;
+    pumpanTimestamp = millis();
+
+    if (PumpeAn && millis() - pumpanTimestamp >= 2000) {
+      PumpeAn = false;
+    }
+  }
+}
+
+void onPumpausChange()  {
+  if (pumpaus) {
+    PumpeAus = true;
+    pumpausTimestamp = millis();
+
+    if (PumpeAus && millis() - pumpausTimestamp >= 2000) {
+      PumpeAus = false;
+    }
+  }
+}
+
+
+:Author: ellauzi
+:Email:
+:Date: 21/03/2023
+:Revision: version#
+:License: Public Domain
+
+= Project: {Project}
+
+Describe your project
+
+== Step 1: Installation
+Please describe the steps to install this project.
+
+For example:
+
+1. Open this file
+2. Edit as you like
+3. Release to the World!
+
+== Step 2: Assemble the circuit
+
+Assemble the circuit following the diagram layout.png attached to the sketch
+
+== Step 3: Load the code
+
+Upload the code contained in this sketch on to your board
+
+=== Folder structure
+
+....
+ sketch123                => Arduino sketch folder
+  ├── sketch123.ino       => main Arduino file
+  ├── schematics.png      => (optional) an image of the required schematics
+  ├── layout.png          => (optional) an image of the layout
+  └── ReadMe.adoc         => this file
+....
+
+=== License
+This project is released under a {License} License.
+
+=== Contributing
+To contribute to this project please contact: 
+
+=== BOM
+Add the bill of the materials you need for this project.
+
+|===
+| ID | Part name      | Part number | Quantity
+| R1 | 10k Resistor   | 1234-abcd   | 10       
+| L1 | Red LED        | 2345-asdf   | 5        
+| A1 | Arduino Zero   | ABX00066    | 1        
+|===
+
+
+=== Help
+This document is written in the _AsciiDoc_ format, a markup language to describe documents. 
+If you need help you can search the http://www.methods.co.nz/asciidoc[AsciiDoc homepage]
+or consult the http://powerman.name/doc/asciidoc[AsciiDoc cheatsheet]
+
+
+
+#define SECRET_SSID "HomeLaaaan"
+#define SECRET_OPTIONAL_PASS "1234567"
+#define SECRET_DEVICE_KEY "ZRCQ65NGTBALZRIQ2NSG"
+
+{
+  "cpu": {
+    "fqbn": "esp8266:esp8266:d1_mini:baud=921600,dbg=Disabled,eesz=4M,exception=disabled,ip=lm2f,lvl=None____,vt=flash,wipe=none,xtal=80",
+    "name": "ESP8266 LOLIN(WEMOS) D1 R2 \u0026 mini",
+    "type": "serial"
+  },
+  "secrets": [
+    {
+      "name": "SECRET_DEVICE_KEY",
+      "value": ""
+    },
+    {
+      "name": "SECRET_OPTIONAL_PASS",
+      "value": ""
+    },
+    {
+      "name": "SECRET_SSID",
+      "value": ""
+    }
+  ],
+  "included_libs": []
+}
+
+#include <ArduinoIoTCloud.h>
+#include <Arduino_ConnectionHandler.h>
+
+// Arduino Geräte Loginname 
+const char DEVICE_LOGIN_NAME[]  = "c851538b-b9f7-422e-a1a8-79ae8aaa6921";
+
+const char SSID[]               = SECRET_SSID;    // Network SSID (name)
+const char PASS[]               = SECRET_OPTIONAL_PASS;    // Network password (use for WPA, or use as key for WEP)
+const char DEVICE_KEY[]  = SECRET_DEVICE_KEY;    // Secret device password
+
+// Anlegen leerer Funktionskörper
+void onLichtanChange();
+void onLichtausChange();
+void onPumpanChange();
+void onPumpausChange();
+void sendDataToSlave();
+void displaySentData();
+void requestDataFromSlave();
+void displayReceivedData();
+void onAnzuchtbetriebChange();
+void onNormalbetriebChange();
+void onVentilatorsteuerungChange();
+void onSommerzeitChange();
+
+
+// Variablen aus Arduino CLoud
+float anzuchtfeuchte;
+float anzuchttemperatur;
+float aussenfeuchte;
+float aussentempertur;
+float feuchteTopf1;
+float feuchteTopf2;
+float feuchtigkeit_1;
+float feuchtigkeit_2;
+float feuchtigkeit_3;
+float feuchtigkeit_4;
+float feuchtigkeit_5;
+float feuchtigkeit_6;
+bool lichtan;
+bool lichtaus;
+bool pumpan;
+bool pumpaus;
+bool anzuchtbetrieb;
+bool normalbetrieb;
+bool ventilatorsteuerung;
+bool Sommerzeit;
+
+
+// Bool Variabeln für IC2 Bus
+bool PumpeAn = false;
+bool LichtAn = false;
+bool PumpeAus = false;
+bool LichtAus = false;
+bool AnzuchtAn = false;
+bool NormalAn = false;
+bool VentilatorAnzuchtAn = false;
+
+//Timervariabeln zur Siganalübertragung
+unsigned long lichtanTimestamp = 0;
+unsigned long lichtausTimestamp = 0;
+unsigned long pumpanTimestamp = 0;
+unsigned long pumpausTimestamp = 0;
+
+
+// Char der Slave Adresse
+const byte SLAVE_ADDRESS = 9;
+
+//Array der Feuchtigkeitsübertragung
+float receivedFeuchtigkeit[6];
+
+
+//  Variabeln zum Empfangen der DHT Sensoren
+float receivedRaumfeuchte1;
+float receivedRaumtemperatur1;
+float receivedRaumfeuchte2;
+float receivedRaumtemperatur2;
+
+
+
+// Erstellen von Properties zum verwaltend er Arduino Cloud Daten
+void initProperties(){
+
+  ArduinoCloud.setBoardId(DEVICE_LOGIN_NAME);
+  ArduinoCloud.setSecretDeviceKey(DEVICE_KEY);
+  ArduinoCloud.addProperty(anzuchtfeuchte, READ, ON_CHANGE, NULL);
+  ArduinoCloud.addProperty(anzuchttemperatur, READ, ON_CHANGE, NULL);
+  ArduinoCloud.addProperty(aussenfeuchte, READ, ON_CHANGE, NULL);
+  ArduinoCloud.addProperty(aussentempertur, READ, ON_CHANGE, NULL);
+  ArduinoCloud.addProperty(feuchteTopf1, READ, ON_CHANGE, NULL);
+  ArduinoCloud.addProperty(feuchteTopf2, READ, ON_CHANGE, NULL);
+  ArduinoCloud.addProperty(feuchtigkeit_1, READ, ON_CHANGE, NULL);
+  ArduinoCloud.addProperty(feuchtigkeit_2, READ, ON_CHANGE, NULL);
+  ArduinoCloud.addProperty(feuchtigkeit_3, READ, ON_CHANGE, NULL);
+  ArduinoCloud.addProperty(feuchtigkeit_4, READ, ON_CHANGE, NULL);
+  ArduinoCloud.addProperty(feuchtigkeit_5, READ, ON_CHANGE, NULL);
+  ArduinoCloud.addProperty(feuchtigkeit_6, READ, ON_CHANGE, NULL);
+  ArduinoCloud.addProperty(lichtan, READWRITE, ON_CHANGE, onLichtanChange);
+  ArduinoCloud.addProperty(lichtaus, READWRITE, ON_CHANGE, onLichtausChange);
+  ArduinoCloud.addProperty(pumpan, READWRITE, ON_CHANGE, onPumpanChange);
+  ArduinoCloud.addProperty(pumpaus, READWRITE, ON_CHANGE, onPumpausChange);
+  ArduinoCloud.addProperty(anzuchtbetrieb, READWRITE, ON_CHANGE, onAnzuchtbetriebChange);
+  ArduinoCloud.addProperty(normalbetrieb, READWRITE, ON_CHANGE, onNormalbetriebChange);
+  ArduinoCloud.addProperty(pumpaus, READWRITE, ON_CHANGE, onPumpausChange);
+  ArduinoCloud.addProperty(ventilatorsteuerung, READWRITE, ON_CHANGE, onVentilatorsteuerungChange);
+  ArduinoCloud.addProperty(Sommerzeit, READWRITE, ON_CHANGE, onSommerzeitChange);
+
+}
+
+WiFiConnectionHandler ArduinoIoTPreferredConnection(SSID, PASS);
+
+
+void onNormalbetriebChange()  {
+
+}
+
+
+void onAnzuchtbetriebChange()  {
+
+}
+
+void requestDataFromSlave() {
+  Wire.requestFrom(SLAVE_ADDRESS, 12 * sizeof(float)); // Request 10 floats
+  for (int i = 0; i < 6; i++) {
+    if (Wire.available() >= sizeof(float)) {
+      float feuchtigkeit = 0;
+      byte *feuchtigkeitBytes = (byte *)&feuchtigkeit;
+      feuchtigkeitBytes[0] = Wire.read();
+      feuchtigkeitBytes[1] = Wire.read();
+      feuchtigkeitBytes[2] = Wire.read();
+      feuchtigkeitBytes[3] = Wire.read();
+      receivedFeuchtigkeit[i] = feuchtigkeit;
+    }
+  }
+
+  // Raumfeuchte 1
+  if (Wire.available() >= sizeof(float)) {
+    byte *raumfeuchteBytes = (byte *)&receivedRaumfeuchte1;
+    raumfeuchteBytes[0] = Wire.read();
+    raumfeuchteBytes[1] = Wire.read();
+    raumfeuchteBytes[2] = Wire.read();
+    raumfeuchteBytes[3] = Wire.read();
+  }
+
+  // Raumtemperatur 1
+  if (Wire.available() >= sizeof(float)) {
+    byte *raumtemperaturBytes = (byte *)&receivedRaumtemperatur1;
+    raumtemperaturBytes[0] = Wire.read();
+    raumtemperaturBytes[1] = Wire.read();
+    raumtemperaturBytes[2] = Wire.read();
+    raumtemperaturBytes[3] = Wire.read();
+  }
+
+  // Raumfeuchte 2
+  if (Wire.available() >= sizeof(float)) {
+    byte *raumfeuchteBytes = (byte *)&receivedRaumfeuchte2;
+    raumfeuchteBytes[0] = Wire.read();
+    raumfeuchteBytes[1] = Wire.read();
+    raumfeuchteBytes[2] = Wire.read();
+    raumfeuchteBytes[3] = Wire.read();
+  }
+
+  // Raumtemperatur 2
+  if (Wire.available() >= sizeof(float)) {
+    byte *raumtemperaturBytes = (byte *)&receivedRaumtemperatur2;
+    raumtemperaturBytes[0] = Wire.read();
+    raumtemperaturBytes[1] = Wire.read();
+    raumtemperaturBytes[2] = Wire.read();
+    raumtemperaturBytes[3] = Wire.read();
+  }
+}
+
+
+void displayReceivedData() {
+  Serial.print("Empfangene Feuchtigkeiten: ");
+  for (int i = 0; i < 6; i++) {
+    Serial.print(receivedFeuchtigkeit[i]);
+    Serial.print(", ");
+  }
+  Serial.print("Raumfeuchte 1: ");
+  Serial.print(receivedRaumfeuchte1);
+  Serial.print(", Raumtemperatur 1: ");
+  Serial.print(receivedRaumtemperatur1);
+  Serial.print(", Raumfeuchte 2: ");
+  Serial.print(receivedRaumfeuchte2);
+  Serial.print(", Raumtemperatur 2: ");
+  Serial.println(receivedRaumtemperatur2);
+}
+
+
+void sendDataToSlave() {
+  byte controlByte = (PumpeAn << 3) | (LichtAn << 2) | (PumpeAus << 1) | LichtAus;
+  controlByte |= (AnzuchtAn << 4) | (NormalAn << 5) | (VentilatorAnzuchtAn << 6);
+
+  Wire.beginTransmission(SLAVE_ADDRESS);
+  Wire.write(timeClient.getFormattedTime().c_str());
+  Wire.write('\t');
+  Wire.write(controlByte);
+  Wire.endTransmission();
+}
+
+void displaySentData() {
+  Serial.print("Gesendete Uhrzeit: ");
+  Serial.println(timeClient.getFormattedTime());
+  Serial.print("PumpeAn: ");
+  Serial.println(PumpeAn);
+  Serial.print("LichtAn: ");
+  Serial.println(LichtAn);
+  Serial.print("PumpeAus: ");
+  Serial.println(PumpeAus);
+  Serial.print("LichtAus: ");
+  Serial.println(LichtAus);
+  Serial.print("AnzuchtAn: ");
+  Serial.println(AnzuchtAn);
+  Serial.print("NormalAn: ");
+  Serial.println(NormalAn);
+  Serial.print("VentilatorAnzuchtAn: ");
+  Serial.println(VentilatorAnzuchtAn);
+}
+
+void setup() {
+
+  // Defined in thingProperties.h
+  initProperties();
+  // Connect to Arduino IoT Cloud
+  ArduinoCloud.begin(ArduinoIoTPreferredConnection);
+
+  setDebugMessageLevel(2);
+  ArduinoCloud.printDebugInfo();
+  setupTimeClient();
+  Serial.begin(9600);
+    Wire.begin();
+}
+
+void updateVariables() {
+  // Update der float Variabeln für die Arduino Cloud 
+  feuchtigkeit_1 = receivedFeuchtigkeit[0];
+  feuchtigkeit_2 = receivedFeuchtigkeit[1];
+  feuchtigkeit_3 = receivedFeuchtigkeit[2];
+  feuchtigkeit_4 = receivedFeuchtigkeit[3];
+  feuchtigkeit_5 = receivedFeuchtigkeit[4];
+  feuchtigkeit_6 = receivedFeuchtigkeit[5];
+  anzuchtfeuchte = receivedRaumfeuchte1;
+  anzuchttemperatur = receivedRaumtemperatur1;
+  aussenfeuchte = receivedRaumfeuchte2;
+  aussentempertur = receivedRaumtemperatur2;
+
+  // Berechnung der Durchschnittsfeuchtigkeit für Topf 1 und Topf 2
+  feuchteTopf1 = (feuchtigkeit_1 + feuchtigkeit_2 + feuchtigkeit_3) / 3;
+  feuchteTopf2 = (feuchtigkeit_4 + feuchtigkeit_5 + feuchtigkeit_6) / 3;
+
+  // Variabelnübetragung Betriebsartenwahl
+AnzuchtAn = anzuchtbetrieb;
+NormalAn = normalbetrieb;
+VentilatorAnzuchtAn = ventilatorsteuerung;
+}
+
+// Initalisierung der Zeiteinstellungen
+void setupTimeClient() {
+  timeClient.begin();
+
+  if (Sommerzeit) {
+    timeClient.setTimeOffset(7200); // Sommerzeit (UTC + 2 Stunden)
+  } else {
+    timeClient.setTimeOffset(3600); // Normale Zeit (UTC + 1 Stunde)
+  }
+}
+
+// Update der Time Client Funktion
+void updateTimeClient() {
+  timeClient.update();
+}
+
+void onVentilatorsteuerungChange() {
+    // Ihr Code hier
+}
+
+// Variabelnfunktion der Variable Sommerzeit
+void onSommerzeitChange(){
+
+}
+

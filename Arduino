@@ -1,0 +1,581 @@
+// Code Arduino Slave in der ic2 verbindung
+
+
+// Inkludieren der Wire-Library für die I2C-Kommunikation
+#include <Wire.h>  
+// Inkludieren der DHT Library zum auswerten des DHT Sensors
+#include "DHT.h"        
+
+
+// Slave Adresse für die Busverbindung
+const byte SLAVE_ADDRESS = 9; // I2C-Slave-Adresse
+
+
+// Pin für den Hygrometer-Sensor
+const int FeuchtigkeitsPin1 = A0;
+const int FeuchtigkeitsPin2 = A1;
+const int FeuchtigkeitsPin3 = A2;
+const int FeuchtigkeitsPin4 = A3;
+const int FeuchtigkeitsPin5 = A4;
+const int FeuchtigkeitsPin6 = A5;
+
+
+// Pin für die Aktoren
+const int PumpenPin = 8;
+const int Licht = 13 ;      //Relais 3
+const int Ventilator1 = 9; // Relais 9
+const int Ventilator2 = 41;  //Relais10
+
+const int Relais1 = 12;
+const int Relais5 = 11;
+const int Relais7 = 10;
+const int Relais11 = 8;
+const int Relais13 = 53;
+const int Relais15 = 51;
+const int Relais2 = 49;
+const int Relais4 = 47;
+const int Relais8 = 45;
+const int Relais6 = 43;;
+const int Relais12 = 39;
+const int Relais14 = 37;
+const int Relais16 = 35;
+
+// Variabeln für die Normale Wassersteuerung
+unsigned long stepstarttime1 = 0;
+byte state = 0;
+byte pumpCycles = 0;
+
+
+// Variabeln für die Ventilatorsteuerung
+int SchrittVenti = 0;
+int hour = 0;
+int minute = 1;
+int second = 0;
+int schleifenvariable = 0;
+
+
+// float Variabeln zum übetragen der Feuchtigkeit
+float Feuchtigkeit1 = 51;
+float Feuchtigkeit2 = 51;
+float Feuchtigkeit3 = 52.32;
+float Feuchtigkeit4 = 53;
+float Feuchtigkeit5 = 54;
+float Feuchtigkeit6 = 55;
+
+
+// float Variabeln übetragen DHT Sensor
+float Raumtemperatur1 = 1;
+float Raumfeuchte1 = 2;
+float GefuehlteTemperatur1 = 3;
+float Raumtemperatur2 = 4;
+float Raumfeuchte2 = 5;
+float GefuehlteTemperatur2 = 6;
+
+
+// bool Variabeln für die Arduino Cloud
+bool PumpeAn = false;
+bool LichtAn = false;
+bool PumpeAus = false;
+bool LichtAus = false;
+bool AnzuchtAn = false;
+bool NormalAn = false;
+bool VentilatorAnzuchtAn = false;
+
+
+// Timer und Vraiabeln für Anzuchtprogramm Gießen
+unsigned long currentMillis = millis();
+unsigned long previousMillis = 0;
+const long GiesszeiitAnzucht = 2000; // GießzeiitAnzucht von 2 Sekunden
+
+
+
+// Definition für den DHT Sensor
+#define DHTPIN 2          // Der digitale Pin, an den der Datenpin des Sensors angeschlossen ist
+#define DHTTYPE DHT22     // DHT22 (AM2302) Sensor verwenden
+
+DHT dht(DHTPIN, DHTTYPE);
+// Definition für den zweiten DHT-Sensor
+#define DHTPIN2 3          // Der digitale Pin, an den der Datenpin des zweiten Sensors angeschlossen ist
+#define DHTTYPE2 DHT22     // DHT22 (AM2302) Sensor verwenden
+
+DHT dht2(DHTPIN2, DHTTYPE2);
+
+
+void Anzuchtsprogramm() {
+  if (AnzuchtAn) {
+  if (PumpeAn) {
+    digitalWrite(PumpenPin, LOW); // Pumpe einschalten
+    previousMillis = currentMillis;
+    PumpeAn = false; // PumpeAn auf false setzen, um erneutes Einschalten zu verhindern, bis sie wieder auf true gesetzt wird
+  }
+
+  if (currentMillis - previousMillis >= GiesszeiitAnzucht) {
+    digitalWrite(PumpenPin, HIGH); // Pumpe ausschalten
+  }
+}
+}
+
+void DHTSensor1() {
+  delay(2000); // Warte 2 Sekunden zwischen den Messungen, da der DHT22-Sensor eine Messpause von mindestens 2 Sekunden benötigt
+
+  // Lesen der Temperatur und Luftfeuchtigkeit vom DHT22-Sensor
+  float humidity = dht.readHumidity();
+  float temperature = dht.readTemperature();
+
+  // Überprüfen, ob die Messwerte gültig sind
+  if (isnan(humidity) || isnan(temperature)) {
+    Serial.println("Fehler beim Lesen des DHT22-Sensors!");
+    return;
+  }
+
+  // Berechnung des Hitzeindex (gefühlte Temperatur)
+  float heatIndex = dht.computeHeatIndex(temperature, humidity, false);
+
+  // Ausgabe der Messwerte über die serielle Schnittstelle
+  Serial.print("Luftfeuchtigkeit: ");
+  Serial.print(Raumfeuchte1);
+  Serial.print(" %\t");
+  Serial.print("Temperatur: ");
+  Serial.print(Raumtemperatur1);
+  Serial.print(" *C\t");
+  Serial.print("Gefühlte Temperatur: ");
+  Serial.print(GefuehlteTemperatur1);
+  Serial.println(" *C");
+
+  // Speichern der Werte in die angegebenen Variablen
+  Raumfeuchte1 = humidity;
+  Raumtemperatur1 = temperature;
+  GefuehlteTemperatur1 = heatIndex;
+
+
+}
+
+
+void DHTSensor2() {
+  delay(2000); // Warte 2 Sekunden zwischen den Messungen, da der DHT22-Sensor eine Messpause von mindestens 2 Sekunden benötigt
+
+  // Lesen der Temperatur und Luftfeuchtigkeit vom zweiten DHT22-Sensor
+  float humidity2 = dht2.readHumidity();
+  float temperature2 = dht2.readTemperature();
+
+  // Überprüfen, ob die Messwerte gültig sind
+  if (isnan(humidity2) || isnan(temperature2)) {
+    Serial.println("Fehler beim Lesen des zweiten DHT22-Sensors!");
+    return;
+  }
+
+  // Berechnung des Hitzeindex (gefühlte Temperatur) für den zweiten Sensor
+  float heatIndex2 = dht2.computeHeatIndex(temperature2, humidity2, false);
+
+  // Ausgabe der Messwerte des zweiten Sensors über die serielle Schnittstelle
+  Serial.print("Luftfeuchtigkeit Sensor 2: ");
+  Serial.print(Raumfeuchte2);
+  Serial.print(" %\t");
+  Serial.print("Temperatur Sensor 2: ");
+  Serial.print(Raumtemperatur2);
+  Serial.print(" *C\t");
+  Serial.print("Gefühlte Temperatur Sensor 2: ");
+  Serial.print(GefuehlteTemperatur2);
+  Serial.println(" *C");
+
+  // Speichern der Werte des zweiten Sensors in die angegebenen Variablen
+  Raumfeuchte2 = humidity2;
+  Raumtemperatur2 = temperature2;
+  GefuehlteTemperatur2 = heatIndex2;
+}
+
+void controlLight() {
+  // Steuerung des Lichts
+  if (hour == 7 || LichtAn == 1) {
+    digitalWrite(Licht, LOW);
+    Serial.print("Licht an");
+
+
+  } else if (hour == 19 || LichtAus == 1) {
+    digitalWrite(Licht, HIGH);
+    Serial.print("Licht aus");
+  }
+}
+
+void controlVentilators() {
+  // Steuerung Ventilatoren
+  if (VentilatorAnzuchtAn) {
+    // If Abfrage für Schritt 0
+    if (schleifenvariable == 4) {
+      SchrittVenti = 0;
+      schleifenvariable = 0;
+      Serial.print("Schritt = (");
+      Serial.print(SchrittVenti, "  ");
+    }
+
+    // If Abfrage für Schritt 1
+    if (SchrittVenti == 0 && (minute == 5 || minute == 10 || minute == 20 || minute == 30 || minute == 40 || minute == 50)) {
+      SchrittVenti = 1;
+      Serial.print("Schritt = (");
+      Serial.print(SchrittVenti, "  ");
+    }
+
+    // If Abfrage für Schritt 2
+    if (SchrittVenti == 1 && (second == 30)) {
+      // Führe Schritt 1 aus
+      SchrittVenti = 2;
+      Serial.print("Schritt = (");
+      Serial.print(SchrittVenti, "  ");
+    }
+
+    // If Abfrage für Schritt 3
+    if (SchrittVenti == 2 && (second == 0)) {
+      // Führe Schritt 2 aus
+      SchrittVenti = 3;
+      schleifenvariable = schleifenvariable + 1;
+      Serial.print("Schritt = (");
+      Serial.print(SchrittVenti, "  ");
+    }
+
+    switch (SchrittVenti) {
+      case 0:
+        digitalWrite(Ventilator1, HIGH);
+        digitalWrite(Ventilator2, HIGH);
+        Serial.print(SchrittVenti);
+        break;
+      case 1:
+        digitalWrite(Ventilator1, LOW);
+        Serial.print("Schritt 1    ");
+        Serial.print(SchrittVenti);
+        Serial.print("Schleifenvariable =");
+        Serial.print(schleifenvariable, "    ");
+        break;
+      case 2:
+        digitalWrite(Ventilator1, HIGH);
+        digitalWrite(Ventilator2, LOW);
+        Serial.print("Schritt 2     ");
+        Serial.print(SchrittVenti);
+        break;
+      case 3:
+        digitalWrite(Ventilator2, HIGH);
+        Serial.print("Schritt 3      ");
+        SchrittVenti = 1;
+        break;
+      default:
+        // Wenn SchrittVenti einen unerwarteten Wert hat, setze ihn auf 0
+        SchrittVenti = 0;
+        break;
+    }
+  } else {
+    SchrittVenti = 0;
+    digitalWrite(Ventilator1, HIGH);
+    digitalWrite(Ventilator2, HIGH);
+  }
+}
+
+
+
+void controlWaterSupply() {
+  switch (state) {
+    case 0: // Initialschritt
+      digitalWrite(PumpenPin, HIGH);
+      if (NormalAn && !AnzuchtAn && Feuchtigkeit1 < 50) {
+        state = 1;
+        stepstarttime1 = millis();
+      }
+      break;
+
+    case 1: // Pumpe einschalten
+      digitalWrite(PumpenPin, LOW);
+      if (millis() - stepstarttime1 >= 2000) { // Gießzeit
+        state = 2;
+        stepstarttime1 = millis();
+      }
+      break;
+
+    case 2: // Pumpe ausschalten
+      digitalWrite(PumpenPin, HIGH);
+      if (millis() - stepstarttime1 >= 1200000) { // 20 Minuten Wartezeit zwiaschen dem gießen
+        pumpCycles++;
+        if (pumpCycles < 3) {
+          state = 1;
+        } else {
+          state = 3;
+          pumpCycles = 0;
+        }
+        stepstarttime1 = millis();
+      }
+      break;
+
+    case 3: // Warten
+      if (millis() - stepstarttime1 >= 3600000) { // 1 Stunde wartezeit zwischen den gießmessungen
+        state = 0;
+      }
+      break;
+  }
+
+  // Serial.print() Anweisungen hinzufügen
+  Serial.print("Aktueller Zustand: ");
+  Serial.println(state);
+  Serial.print("Anzahl der Pumpenzyklen: ");
+  Serial.println(pumpCycles);
+  Serial.print("Zeitstempel: ");
+  Serial.println(millis());
+  Serial.println("----------------");
+}
+
+void displayHumidity() {
+
+// Lesen des Wertes vom Hygrometer-Sensor1
+float Feuchtigkeitswert1 = analogRead(FeuchtigkeitsPin1);
+// Berechnen des Feuchtigkeitswerts in Prozent als Gleitkommazahl
+float FeuchtigKeit1 = map(Feuchtigkeitswert1, 810, 380, 0.0, 100.0);
+Serial.print("Sensorwert1:  ");
+Serial.print(Feuchtigkeitswert1);
+Serial.print("   ");
+Feuchtigkeit1 = FeuchtigKeit1;
+
+// Lesen des Wertes vom Hygrometer-Sensor1
+float Feuchtigkeitswert2 = analogRead(FeuchtigkeitsPin2);
+// Berechnen des Feuchtigkeitswerts in Prozent
+float FeuchtigKeit2 = map(Feuchtigkeitswert2, 810, 410, 0.0, 100.0);
+Serial.print("Sensorwert2:  ");
+Serial.print(Feuchtigkeitswert2);
+Serial.print("   ");
+Feuchtigkeit2 = FeuchtigKeit2;
+
+// Lesen des Wertes vom Hygrometer-Sensor1
+float Feuchtigkeitswert3 = analogRead(FeuchtigkeitsPin3);
+// Berechnen des Feuchtigkeitswerts in Prozent
+float FeuchtigKeit3 = map(Feuchtigkeitswert3, 810, 410, 0.0, 100.0);
+Serial.print("Sensorwert3:  ");
+Serial.print(Feuchtigkeitswert3);
+Serial.print("   ");
+Feuchtigkeit3 = FeuchtigKeit3;
+
+// Lesen des Wertes vom Hygrometer-Sensor1
+float Feuchtigkeitswert4 = analogRead(FeuchtigkeitsPin4);
+// Berechnen des Feuchtigkeitswerts in Prozent
+float FeuchtigKeit4 = map(Feuchtigkeitswert4, 810, 410, 0.0, 100.0);
+Serial.print("Sensorwert4:  ");
+Serial.print(Feuchtigkeitswert4);
+Serial.print("   ");
+Feuchtigkeit4 = FeuchtigKeit4;
+
+// Lesen des Wertes vom Hygrometer-Sensor1
+float Feuchtigkeitswert5 = analogRead(FeuchtigkeitsPin5);
+// Berechnen des Feuchtigkeitswerts in Prozent
+float FeuchtigKeit5 = map(Feuchtigkeitswert5, 810, 410, 0.0, 100.0);
+Serial.print("Sensorwert5:  ");
+Serial.print(Feuchtigkeitswert5);
+Serial.print("   ");
+Feuchtigkeit5 = FeuchtigKeit5;
+
+// Lesen des Wertes vom Hygrometer-Sensor1
+float Feuchtigkeitswert6 = analogRead(FeuchtigkeitsPin6);
+// Berechnen des Feuchtigkeitswerts in Prozent
+float FeuchtigKeit6 = map(Feuchtigkeitswert6, 810, 410, 0.0, 100.0);
+Serial.print("Sensorwert6:  ");
+Serial.print(Feuchtigkeitswert6);
+Serial.print("   ");
+Feuchtigkeit6 = FeuchtigKeit6;
+
+
+
+}
+
+void loop() {
+  displayHumidity();
+  controlWaterSupply();
+  controlLight();
+  controlVentilators();
+  DHTSensor1();
+  Anzuchtsprogramm ();
+  DHTSensor2();
+
+  
+  delay(1000); // Kurze Verzögerung zur Entlastung der CPU
+  
+
+
+}
+
+
+void receiveData(int byteCount) {
+  String message = "";
+  while (Wire.available()) {
+    char c = Wire.read();
+    if (c == '\t') {
+      break;
+    }
+    message += c;
+  }
+
+  // Aufteilen der empfangenen Uhrzeit in Stunden, Minuten und Sekunden
+  int timeSeparatorIndex1 = message.indexOf(':');
+  int timeSeparatorIndex2 = message.indexOf(':', timeSeparatorIndex1 + 1);
+
+  hour = message.substring(0, timeSeparatorIndex1).toInt();
+  minute = message.substring(timeSeparatorIndex1 + 1, timeSeparatorIndex2).toInt();
+  second = message.substring(timeSeparatorIndex2 + 1, timeSeparatorIndex2 + 3).toInt();
+
+  // Empfange boolsche Variablen
+  if (Wire.available()) {
+    byte controlByte = Wire.read();
+    PumpeAn = (controlByte >> 3) & 1;
+    LichtAn = (controlByte >> 2) & 1;
+    PumpeAus = (controlByte >> 1) & 1;
+    LichtAus = controlByte & 1;
+    AnzuchtAn = (controlByte >> 4) & 1;
+    NormalAn = (controlByte >> 5) & 1;
+    VentilatorAnzuchtAn = (controlByte >> 6) & 1;
+  }
+
+  // Anzeigen der empfangenen Daten
+  Serial.print("Empfangene Uhrzeit: ");
+  Serial.print(hour);
+  Serial.print(":");
+  Serial.print(minute);
+  Serial.print(":");
+  Serial.println(second);
+
+  Serial.print("PumpeAn: ");
+  Serial.println(PumpeAn);
+  Serial.print("LichtAn: ");
+  Serial.println(LichtAn);
+  Serial.print("PumpeAus: ");
+  Serial.println(PumpeAus);
+  Serial.print("LichtAus: ");
+  Serial.println(LichtAus);
+  Serial.print("AnzuchtAn: ");
+  Serial.println(AnzuchtAn);
+  Serial.print("NormalAn: ");
+  Serial.println(NormalAn);
+  Serial.print("VentilatorAnzuchtAn: ");
+  Serial.println(VentilatorAnzuchtAn);
+}
+
+
+void sendData() {
+  byte buffer[4];
+
+  // Feuchtigkeit 1
+  float feuchtigkeit1 = Feuchtigkeit1;
+  memcpy(buffer, &feuchtigkeit1, sizeof(feuchtigkeit1));
+  Wire.write(buffer, sizeof(buffer));
+
+  // Feuchtigkeit 2
+  float feuchtigkeit2 = Feuchtigkeit2;
+  memcpy(buffer, &feuchtigkeit2, sizeof(feuchtigkeit2));
+  Wire.write(buffer, sizeof(buffer));
+
+  // Feuchtigkeit 3
+  float feuchtigkeit3 = Feuchtigkeit3;
+  memcpy(buffer, &feuchtigkeit3, sizeof(feuchtigkeit3));
+  Wire.write(buffer, sizeof(buffer));
+
+  // Feuchtigkeit 4
+  float feuchtigkeit4 = Feuchtigkeit4;
+  memcpy(buffer, &feuchtigkeit4, sizeof(feuchtigkeit4));
+  Wire.write(buffer, sizeof(buffer));
+
+  // Feuchtigkeit 5
+  float feuchtigkeit5 = Feuchtigkeit5;
+  memcpy(buffer, &feuchtigkeit5, sizeof(feuchtigkeit5));
+  Wire.write(buffer, sizeof(buffer));
+
+  // Feuchtigkeit 6
+  float feuchtigkeit6 = Feuchtigkeit6;
+  memcpy(buffer, &feuchtigkeit6, sizeof(feuchtigkeit6));
+  Wire.write(buffer, sizeof(buffer));
+
+  // Raumfeuchte 1
+  float raumfeuchte1 = Raumfeuchte1;
+  memcpy(buffer, &raumfeuchte1, sizeof(raumfeuchte1));
+  Wire.write(buffer, sizeof(buffer));
+
+  // Raumtemperatur 1
+  float raumtemperatur1 = Raumtemperatur1;
+  memcpy(buffer, &raumtemperatur1, sizeof(raumtemperatur1));
+  Wire.write(buffer, sizeof(buffer));
+
+  // Raumfeuchte 2
+  float raumfeuchte2 = Raumfeuchte2;
+  memcpy(buffer, &raumfeuchte2, sizeof(raumfeuchte2));
+  Wire.write(buffer, sizeof(buffer));
+
+  // Raumtemperatur 2
+  float raumtemperatur2 = Raumtemperatur2;
+  memcpy(buffer, &raumtemperatur2, sizeof(raumtemperatur2));
+  Wire.write(buffer, sizeof(buffer));
+
+
+
+
+  Serial.print("Gesendete Feuchtigkeiten: ");
+  Serial.print(feuchtigkeit1);
+  Serial.print(", ");
+  Serial.print(feuchtigkeit2);
+  Serial.print(", ");
+  Serial.print(feuchtigkeit3);
+  Serial.print(", ");
+  Serial.print(feuchtigkeit4);
+  Serial.print(", ");
+  Serial.print(feuchtigkeit5);
+  Serial.print(", ");
+  Serial.print(feuchtigkeit6);
+  Serial.print(", Raumfeuchte: ");
+  Serial.print(raumfeuchte1);
+  Serial.print(", Raumtemperatur: ");
+  Serial.println(raumtemperatur1);
+  Serial.print(", Raumfeuchte 2: ");
+  Serial.print(raumfeuchte2);
+  Serial.print(", Raumtemperatur 2: ");
+  Serial.println(raumtemperatur2);
+}
+
+
+void setup() {
+  Serial.begin(115200);           // Initialisieren der seriellen Schnittstelle
+  Wire.begin(SLAVE_ADDRESS);      // Initialisieren der I2C-Kommunikation als Slave
+  Wire.onReceive(receiveData); 
+  Wire.onRequest(sendData);   // Registrieren der receiveData-Funktion als Callback
+  pinMode(8, OUTPUT);
+  pinMode(9, OUTPUT);
+  pinMode(10, OUTPUT);
+  pinMode(11, OUTPUT);
+  pinMode(12, OUTPUT);
+  pinMode(13, OUTPUT);
+  pinMode(53, OUTPUT);
+  pinMode(51, OUTPUT);
+  pinMode(49, OUTPUT);
+  pinMode(47, OUTPUT);
+  pinMode(45, OUTPUT);
+  pinMode(43, OUTPUT);
+  pinMode(41, OUTPUT);
+  pinMode(39, OUTPUT);
+  pinMode(37, OUTPUT);
+  pinMode(35, OUTPUT);
+  digitalWrite(8, HIGH);
+  digitalWrite(9, HIGH);
+  digitalWrite(10, HIGH);
+  digitalWrite(11, HIGH);
+  digitalWrite(12, HIGH);
+  digitalWrite(13, HIGH);
+  digitalWrite(53, HIGH);
+  digitalWrite(51, HIGH);
+  digitalWrite(49, HIGH);
+  digitalWrite(47, HIGH);
+  digitalWrite(45, HIGH);
+  digitalWrite(43, HIGH);
+  digitalWrite(41, HIGH);
+  digitalWrite(39, HIGH);
+  digitalWrite(37, HIGH);
+  digitalWrite(35, HIGH);
+  
+  dht.begin();        // DHT-Sensor initialisieren
+
+
+}
+
+
+
+
+
+
+

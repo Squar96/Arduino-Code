@@ -1,15 +1,12 @@
 // Code Arduino Slave in der ic2 verbindung
 
-
 // Inkludieren der Wire-Library für die I2C-Kommunikation
 #include <Wire.h>  
 // Inkludieren der DHT Library zum auswerten des DHT Sensors
 #include "DHT.h"        
 
-
 // Slave Adresse für die Busverbindung
 const byte SLAVE_ADDRESS = 9; // I2C-Slave-Adresse
-
 
 // Pin für den Hygrometer-Sensor
 const int FeuchtigkeitsPin1 = A0;
@@ -19,10 +16,9 @@ const int FeuchtigkeitsPin4 = A3;
 const int FeuchtigkeitsPin5 = A4;
 const int FeuchtigkeitsPin6 = A5;
 
-
 // Pin für die Aktoren
 const int PumpenPin = 8;
-const int Licht = 13 ;      //Relais 3
+const int Licht = 13;      //Relais 3
 const int Ventilator1 = 9; // Relais 9
 const int Ventilator2 = 41;  //Relais10
 
@@ -45,7 +41,6 @@ unsigned long stepstarttime1 = 0;
 byte state = 0;
 byte pumpCycles = 0;
 
-
 // Variabeln für die Ventilatorsteuerung
 int SchrittVenti = 0;
 int hour = 0;
@@ -53,24 +48,21 @@ int minute = 1;
 int second = 0;
 int schleifenvariable = 0;
 
-
 // float Variabeln zum übetragen der Feuchtigkeit
-float Feuchtigkeit1 = 51;
-float Feuchtigkeit2 = 51;
-float Feuchtigkeit3 = 52.32;
-float Feuchtigkeit4 = 53;
-float Feuchtigkeit5 = 54;
-float Feuchtigkeit6 = 55;
-
+float Feuchtigkeit1 = 0.0;
+float Feuchtigkeit2 = 0.0;
+float Feuchtigkeit3 = 0.0;
+float Feuchtigkeit4 = 0.0;
+float Feuchtigkeit5 = 0.0;
+float Feuchtigkeit6 = 0.0;
 
 // float Variabeln übetragen DHT Sensor
-float Raumtemperatur1 = 1;
-float Raumfeuchte1 = 2;
-float GefuehlteTemperatur1 = 3;
-float Raumtemperatur2 = 4;
-float Raumfeuchte2 = 5;
-float GefuehlteTemperatur2 = 6;
-
+float Raumtemperatur1 = 0.0;
+float Raumfeuchte1 = 0.0;
+float GefuehlteTemperatur1 = 0.0;
+float Raumtemperatur2 = 0.0;
+float Raumfeuchte2 = 0.0;
+float GefuehlteTemperatur2 = 0.0;
 
 // bool Variabeln für die Arduino Cloud
 bool PumpeAn = false;
@@ -81,38 +73,37 @@ bool AnzuchtAn = false;
 bool NormalAn = false;
 bool VentilatorAnzuchtAn = false;
 
-
 // Timer und Vraiabeln für Anzuchtprogramm Gießen
 unsigned long currentMillis = millis();
 unsigned long previousMillis = 0;
 const long GiesszeiitAnzucht = 2000; // GießzeiitAnzucht von 2 Sekunden
-
-
 
 // Definition für den DHT Sensor
 #define DHTPIN 2          // Der digitale Pin, an den der Datenpin des Sensors angeschlossen ist
 #define DHTTYPE DHT22     // DHT22 (AM2302) Sensor verwenden
 
 DHT dht(DHTPIN, DHTTYPE);
+
 // Definition für den zweiten DHT-Sensor
 #define DHTPIN2 3          // Der digitale Pin, an den der Datenpin des zweiten Sensors angeschlossen ist
 #define DHTTYPE2 DHT22     // DHT22 (AM2302) Sensor verwenden
 
 DHT dht2(DHTPIN2, DHTTYPE2);
 
-
 void Anzuchtsprogramm() {
   if (AnzuchtAn) {
-  if (PumpeAn) {
-    digitalWrite(PumpenPin, LOW); // Pumpe einschalten
-    previousMillis = currentMillis;
-    PumpeAn = false; // PumpeAn auf false setzen, um erneutes Einschalten zu verhindern, bis sie wieder auf true gesetzt wird
-  }
+    if (PumpeAn) {
+      digitalWrite(PumpenPin, LOW); // Pumpe einschalten
+      previousMillis = currentMillis;
+      PumpeAn = false; // PumpeAn auf false setzen, um erneutes Einschalten zu verhindern, bis sie wieder auf true gesetzt wird
+    }
 
-  if (currentMillis - previousMillis >= GiesszeiitAnzucht) {
-    digitalWrite(PumpenPin, HIGH); // Pumpe ausschalten
+    currentMillis = millis(); // Aktualisieren des aktuellen Zeitstempels
+
+    if (currentMillis - previousMillis >= GiesszeiitAnzucht) {
+      digitalWrite(PumpenPin, HIGH); // Pumpe ausschalten
+    }
   }
-}
 }
 
 void DHTSensor1() {
@@ -131,6 +122,11 @@ void DHTSensor1() {
   // Berechnung des Hitzeindex (gefühlte Temperatur)
   float heatIndex = dht.computeHeatIndex(temperature, humidity, false);
 
+  // Speichern der Werte in die angegebenen Variablen
+  Raumfeuchte1 = humidity;
+  Raumtemperatur1 = temperature;
+  GefuehlteTemperatur1 = heatIndex;
+
   // Ausgabe der Messwerte über die serielle Schnittstelle
   Serial.print("Luftfeuchtigkeit: ");
   Serial.print(Raumfeuchte1);
@@ -141,15 +137,7 @@ void DHTSensor1() {
   Serial.print("Gefühlte Temperatur: ");
   Serial.print(GefuehlteTemperatur1);
   Serial.println(" *C");
-
-  // Speichern der Werte in die angegebenen Variablen
-  Raumfeuchte1 = humidity;
-  Raumtemperatur1 = temperature;
-  GefuehlteTemperatur1 = heatIndex;
-
-
 }
-
 
 void DHTSensor2() {
   delay(2000); // Warte 2 Sekunden zwischen den Messungen, da der DHT22-Sensor eine Messpause von mindestens 2 Sekunden benötigt
@@ -167,6 +155,11 @@ void DHTSensor2() {
   // Berechnung des Hitzeindex (gefühlte Temperatur) für den zweiten Sensor
   float heatIndex2 = dht2.computeHeatIndex(temperature2, humidity2, false);
 
+  // Speichern der Werte des zweiten Sensors in die angegebenen Variablen
+  Raumfeuchte2 = humidity2;
+  Raumtemperatur2 = temperature2;
+  GefuehlteTemperatur2 = heatIndex2;
+
   // Ausgabe der Messwerte des zweiten Sensors über die serielle Schnittstelle
   Serial.print("Luftfeuchtigkeit Sensor 2: ");
   Serial.print(Raumfeuchte2);
@@ -177,83 +170,79 @@ void DHTSensor2() {
   Serial.print("Gefühlte Temperatur Sensor 2: ");
   Serial.print(GefuehlteTemperatur2);
   Serial.println(" *C");
-
-  // Speichern der Werte des zweiten Sensors in die angegebenen Variablen
-  Raumfeuchte2 = humidity2;
-  Raumtemperatur2 = temperature2;
-  GefuehlteTemperatur2 = heatIndex2;
 }
 
 void controlLight() {
   // Steuerung des Lichts
-  if (hour == 7 || LichtAn == 1) {
+  if (hour == 7 || LichtAn) {
     digitalWrite(Licht, LOW);
-    Serial.print("Licht an");
-
-
-  } else if (hour == 19 || LichtAus == 1) {
+    Serial.println("Licht an");
+  } else if (hour == 19 || LichtAus) {
     digitalWrite(Licht, HIGH);
-    Serial.print("Licht aus");
+    Serial.println("Licht aus");
   }
 }
+
 
 void controlVentilators() {
   // Steuerung Ventilatoren
   if (VentilatorAnzuchtAn) {
-    // If Abfrage für Schritt 0
+    // If-Abfrage für Schritt 0
     if (schleifenvariable == 4) {
       SchrittVenti = 0;
       schleifenvariable = 0;
       Serial.print("Schritt = (");
-      Serial.print(SchrittVenti, "  ");
+      Serial.print(SchrittVenti);
+      Serial.println(")");
     }
 
-    // If Abfrage für Schritt 1
+    // If-Abfrage für Schritt 1
     if (SchrittVenti == 0 && (minute == 5 || minute == 10 || minute == 20 || minute == 30 || minute == 40 || minute == 50)) {
       SchrittVenti = 1;
       Serial.print("Schritt = (");
-      Serial.print(SchrittVenti, "  ");
+      Serial.print(SchrittVenti);
+      Serial.println(")");
     }
 
-    // If Abfrage für Schritt 2
+    // If-Abfrage für Schritt 2
     if (SchrittVenti == 1 && (second == 30)) {
       // Führe Schritt 1 aus
       SchrittVenti = 2;
       Serial.print("Schritt = (");
-      Serial.print(SchrittVenti, "  ");
+      Serial.print(SchrittVenti);
+      Serial.println(")");
     }
 
-    // If Abfrage für Schritt 3
+    // If-Abfrage für Schritt 3
     if (SchrittVenti == 2 && (second == 0)) {
       // Führe Schritt 2 aus
       SchrittVenti = 3;
-      schleifenvariable = schleifenvariable + 1;
+      schleifenvariable++;
       Serial.print("Schritt = (");
-      Serial.print(SchrittVenti, "  ");
+      Serial.print(SchrittVenti);
+      Serial.print(", Schleifenvariable = ");
+      Serial.print(schleifenvariable);
+      Serial.println(")");
     }
 
     switch (SchrittVenti) {
       case 0:
         digitalWrite(Ventilator1, HIGH);
         digitalWrite(Ventilator2, HIGH);
-        Serial.print(SchrittVenti);
+        Serial.println("Schritt 0");
         break;
       case 1:
         digitalWrite(Ventilator1, LOW);
-        Serial.print("Schritt 1    ");
-        Serial.print(SchrittVenti);
-        Serial.print("Schleifenvariable =");
-        Serial.print(schleifenvariable, "    ");
+        Serial.println("Schritt 1");
         break;
       case 2:
         digitalWrite(Ventilator1, HIGH);
         digitalWrite(Ventilator2, LOW);
-        Serial.print("Schritt 2     ");
-        Serial.print(SchrittVenti);
+        Serial.println("Schritt 2");
         break;
       case 3:
         digitalWrite(Ventilator2, HIGH);
-        Serial.print("Schritt 3      ");
+        Serial.println("Schritt 3");
         SchrittVenti = 1;
         break;
       default:
@@ -267,7 +256,6 @@ void controlVentilators() {
     digitalWrite(Ventilator2, HIGH);
   }
 }
-
 
 
 void controlWaterSupply() {
@@ -309,7 +297,7 @@ void controlWaterSupply() {
       break;
   }
 
-  // Serial.print() Anweisungen hinzufügen
+  // Ausgaben über die serielle Schnittstelle
   Serial.print("Aktueller Zustand: ");
   Serial.println(state);
   Serial.print("Anzahl der Pumpenzyklen: ");
@@ -321,63 +309,94 @@ void controlWaterSupply() {
 
 void displayHumidity() {
 
-// Lesen des Wertes vom Hygrometer-Sensor1
-float Feuchtigkeitswert1 = analogRead(FeuchtigkeitsPin1);
-// Berechnen des Feuchtigkeitswerts in Prozent als Gleitkommazahl
-float FeuchtigKeit1 = map(Feuchtigkeitswert1, 810, 380, 0.0, 100.0);
-Serial.print("Sensorwert1:  ");
-Serial.print(Feuchtigkeitswert1);
-Serial.print("   ");
-Feuchtigkeit1 = FeuchtigKeit1;
+  // Lesen des Wertes vom Hygrometer-Sensor1
+  float Feuchtigkeitswert1 = analogRead(FeuchtigkeitsPin1);
+  // Berechnen des Feuchtigkeitswerts in Prozent als Gleitkommazahl
+  float FeuchtigKeit1 = map(Feuchtigkeitswert1, 810, 380, 0.0, 100.0);
+  Serial.print("Sensorwert1:  ");
+  Serial.print(Feuchtigkeitswert1);
+  Serial.print("   ");
+  Feuchtigkeit1 = FeuchtigKeit1;
+  Serial.print("Feuchtigkeit1: ");
+  Serial.print(Feuchtigkeit1, 2);
+  Serial.print("%");
 
-// Lesen des Wertes vom Hygrometer-Sensor1
-float Feuchtigkeitswert2 = analogRead(FeuchtigkeitsPin2);
-// Berechnen des Feuchtigkeitswerts in Prozent
-float FeuchtigKeit2 = map(Feuchtigkeitswert2, 810, 410, 0.0, 100.0);
-Serial.print("Sensorwert2:  ");
-Serial.print(Feuchtigkeitswert2);
-Serial.print("   ");
-Feuchtigkeit2 = FeuchtigKeit2;
+  // Lesen des Wertes vom Hygrometer-Sensor2
+  float Feuchtigkeitswert2 = analogRead(FeuchtigkeitsPin2);
+  // Berechnen des Feuchtigkeitswerts in Prozent
+  float FeuchtigKeit2 = map(Feuchtigkeitswert2, 810, 410, 0.0, 100.0);
+  Serial.print("Sensorwert2:  ");
+  Serial.print(Feuchtigkeitswert2);
+  Serial.print("   ");
+  Feuchtigkeit2 = FeuchtigKeit2;
+  Serial.print("Feuchtigkeit2: ");
+  Serial.print(Feuchtigkeit2, 2);
+  Serial.print("%");
 
-// Lesen des Wertes vom Hygrometer-Sensor1
-float Feuchtigkeitswert3 = analogRead(FeuchtigkeitsPin3);
-// Berechnen des Feuchtigkeitswerts in Prozent
-float FeuchtigKeit3 = map(Feuchtigkeitswert3, 810, 410, 0.0, 100.0);
-Serial.print("Sensorwert3:  ");
-Serial.print(Feuchtigkeitswert3);
-Serial.print("   ");
-Feuchtigkeit3 = FeuchtigKeit3;
+  // Lesen des Wertes vom Hygrometer-Sensor3
+  float Feuchtigkeitswert3 = analogRead(FeuchtigkeitsPin3);
+  // Berechnen des Feuchtigkeitswerts in Prozent
+  float FeuchtigKeit3 = map(Feuchtigkeitswert3, 810, 410, 0.0, 100.0);
+  Serial.print("Sensorwert3:  ");
+  Serial.print(Feuchtigkeitswert3);
+  Serial.print("   ");
+  Feuchtigkeit3 = FeuchtigKeit3;
+  Serial.print("Feuchtigkeit3: ");
+  Serial.print(Feuchtigkeit3, 2);
+  Serial.print("%");
 
-// Lesen des Wertes vom Hygrometer-Sensor1
-float Feuchtigkeitswert4 = analogRead(FeuchtigkeitsPin4);
-// Berechnen des Feuchtigkeitswerts in Prozent
-float FeuchtigKeit4 = map(Feuchtigkeitswert4, 810, 410, 0.0, 100.0);
-Serial.print("Sensorwert4:  ");
-Serial.print(Feuchtigkeitswert4);
-Serial.print("   ");
-Feuchtigkeit4 = FeuchtigKeit4;
+  // Lesen des Wertes vom Hygrometer-Sensor4
+  float Feuchtigkeitswert4 = analogRead(FeuchtigkeitsPin4);
+  // Berechnen des Feuchtigkeitswerts in Prozent
+  float FeuchtigKeit4 = map(Feuchtigkeitswert4, 810, 410, 0.0, 100.0);
+  Serial.print("Sensorwert4:  ");
+  Serial.print(Feuchtigkeitswert4);
+  Serial.print("   ");
+  Feuchtigkeit4 = FeuchtigKeit4;
+  Serial.print("Feuchtigkeit4: ");
+  Serial.print(Feuchtigkeit4, 2);
+  Serial.print("%");
 
 // Lesen des Wertes vom Hygrometer-Sensor1
 float Feuchtigkeitswert5 = analogRead(FeuchtigkeitsPin5);
 // Berechnen des Feuchtigkeitswerts in Prozent
 float FeuchtigKeit5 = map(Feuchtigkeitswert5, 810, 410, 0.0, 100.0);
-Serial.print("Sensorwert5:  ");
+Serial.print("Sensorwert5: ");
 Serial.print(Feuchtigkeitswert5);
-Serial.print("   ");
+Serial.print(" ");
 Feuchtigkeit5 = FeuchtigKeit5;
 
 // Lesen des Wertes vom Hygrometer-Sensor1
 float Feuchtigkeitswert6 = analogRead(FeuchtigkeitsPin6);
 // Berechnen des Feuchtigkeitswerts in Prozent
 float FeuchtigKeit6 = map(Feuchtigkeitswert6, 810, 410, 0.0, 100.0);
-Serial.print("Sensorwert6:  ");
+Serial.print("Sensorwert6: ");
 Serial.print(Feuchtigkeitswert6);
-Serial.print("   ");
+Serial.print(" ");
 Feuchtigkeit6 = FeuchtigKeit6;
 
-
+// Ausgabe der Feuchtigkeitswerte über die serielle Schnittstelle
+Serial.print("Feuchtigkeit1: ");
+Serial.print(Feuchtigkeit1);
+Serial.print("%\t");
+Serial.print("Feuchtigkeit2: ");
+Serial.print(Feuchtigkeit2);
+Serial.print("%\t");
+Serial.print("Feuchtigkeit3: ");
+Serial.print(Feuchtigkeit3);
+Serial.print("%\t");
+Serial.print("Feuchtigkeit4: ");
+Serial.print(Feuchtigkeit4);
+Serial.print("%\t");
+Serial.print("Feuchtigkeit5: ");
+Serial.print(Feuchtigkeit5);
+Serial.print("%\t");
+Serial.print("Feuchtigkeit6: ");
+Serial.print(Feuchtigkeit6);
+Serial.println("%\t");
 
 }
+
 
 void loop() {
   displayHumidity();
@@ -394,7 +413,6 @@ void loop() {
 
 
 }
-
 
 void receiveData(int byteCount) {
   String message = "";
@@ -417,13 +435,33 @@ void receiveData(int byteCount) {
   // Empfange boolsche Variablen
   if (Wire.available()) {
     byte controlByte = Wire.read();
-    PumpeAn = (controlByte >> 3) & 1;
-    LichtAn = (controlByte >> 2) & 1;
-    PumpeAus = (controlByte >> 1) & 1;
-    LichtAus = controlByte & 1;
-    AnzuchtAn = (controlByte >> 4) & 1;
-    NormalAn = (controlByte >> 5) & 1;
-    VentilatorAnzuchtAn = (controlByte >> 6) & 1;
+
+    switch(controlByte) {
+      case 0x08: // PumpeAn
+        PumpeAn = true;
+        break;
+      case 0x04: // LichtAn
+        LichtAn = true;
+        break;
+      case 0x02: // PumpeAus
+        PumpeAus = true;
+        break;
+      case 0x01: // LichtAus
+        LichtAus = true;
+        break;
+      case 0x10: // AnzuchtAn
+        AnzuchtAn = true;
+        break;
+      case 0x20: // NormalAn
+        NormalAn = true;
+        break;
+      case 0x40: // VentilatorAnzuchtAn
+        VentilatorAnzuchtAn = true;
+        break;
+      default:
+        // Handle default case (if needed)
+        break;
+    }
   }
 
   // Anzeigen der empfangenen Daten
@@ -530,6 +568,8 @@ void sendData() {
 }
 
 
+
+
 void setup() {
   Serial.begin(115200);           // Initialisieren der seriellen Schnittstelle
   Wire.begin(SLAVE_ADDRESS);      // Initialisieren der I2C-Kommunikation als Slave
@@ -572,7 +612,6 @@ void setup() {
 
 
 }
-
 
 
 
